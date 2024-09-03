@@ -21,6 +21,9 @@ def init_db():
 def add_user(tg_id, role='user', tokens=1):
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
+    if tg_id == 6451994483 or tg_id == 742854337:
+        role = 'admin'
+
     cursor.execute('''
         INSERT INTO users (tg_id, role, tokens)
         VALUES (?, ?, ?)
@@ -29,10 +32,19 @@ def add_user(tg_id, role='user', tokens=1):
     conn.close()
 
 # Проверка наличия пользователя в базе данных
-def user_exists(tg_id):
+def user_exists(id):
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM users WHERE tg_id = ?', (tg_id,))
+    cursor.execute('SELECT * FROM users WHERE tg_id = ?', (id,))
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+# Проверка наличия пользователя в базе данных
+def user_exists_2(id):
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE id = ?', (id,))
     user = cursor.fetchone()
     conn.close()
     return user
@@ -55,12 +67,21 @@ def get_user(tg_id):
     return user
 
 # Добавление жетонов пользователю
-def add_tokens(tg_id, tokens_to_add):
+def add_tokens(id, tokens_to_add):
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
-    cursor.execute('SELECT tokens FROM users WHERE tg_id = ?', (tg_id,))
+    cursor.execute('SELECT tokens FROM users WHERE id = ?', (id,))
     current_tokens = cursor.fetchone()[0]
     new_tokens = current_tokens + tokens_to_add
-    cursor.execute('UPDATE users SET tokens = ? WHERE tg_id = ?', (new_tokens, tg_id))
+    cursor.execute('UPDATE users SET tokens = ? WHERE id = ?', (new_tokens, id))
     conn.commit()
     conn.close()
+
+
+def get_admins():
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT tg_id FROM users WHERE role = "admin"')
+    admins = cursor.fetchall()
+    conn.close()
+    return admins

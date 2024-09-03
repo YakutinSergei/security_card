@@ -1,4 +1,3 @@
-from pydantic_settings import BaseSettings
 from dataclasses import dataclass
 from environs import Env
 

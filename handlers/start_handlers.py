@@ -1,4 +1,6 @@
 import os
+import re
+
 from aiogram import Bot, Dispatcher, types, F, Router
 from aiogram.filters import Command, StateFilter, CommandStart
 from aiogram.fsm.state import State, StatesGroup
@@ -9,8 +11,8 @@ from rembg import remove
 from PIL import Image, ImageDraw, ImageFont
 
 from create_bot import bot
-from database import init_db, add_user, user_exists, get_user, update_tokens, add_tokens
-from menu.menu import create_inline_kb
+from database import init_db, add_user, user_exists, get_user, update_tokens, add_tokens, get_admins, user_exists_2
+from menu.menu import create_inline_kb, price_kb
 
 router: Router = Router()
 
@@ -20,6 +22,7 @@ class Form(StatesGroup):
     korean_name = State()
     birth_date = State()
     photo = State()
+    price = State()
 
 
 # Стартовая команда
@@ -32,34 +35,89 @@ async def start(message: types.Message, state: FSMContext):
         add_user(tg_id)
 
     user = get_user(tg_id)
+
     tokens = user[3]
-    if tokens <= -546:
-        await message.answer("У вас не осталось жетонов для генерации картинки. Свяжитесь с администратором для пополнения жетонов.")
+    if tokens <= 0 or user[2] == 'admin':
+        await message.answer(
+            "У вас не осталось жетонов для генерации картинки. Свяжитесь с администратором для пополнения жетонов.",
+            reply_markup=await price_kb())
         return
 
     await message.answer("Введите ваше имя на корейском языке:", reply_markup=await create_inline_kb())
     await state.set_state(Form.korean_name)
 
+
 # Обработка команды отмены
 @router.callback_query(F.data == 'Cancel')
-async def cancel_process(message: types.Message, state: FSMContext):
+async def cancel_process(callback_query: types.CallbackQuery, state: FSMContext):
     await state.clear()
-    await message.answer("Операция отменена. Вы можете начать заново, нажав /start.")
+    await callback_query.message.answer("Операция отменена. Вы можете начать заново, нажав /start.")
+
+
+# Обработка команды покупки
+@router.callback_query(F.data == 'price')
+async def price_process(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.set_state(Form.price)
+    await callback_query.message.answer("Для покупки карты безопасности сделайте перевод в размере 5000 рублей на номер карты 0000 0000 0000 0000 0000 и отправьте чек.\n"
+                                        "Или нажмите кнопку отмена",
+                                        reply_markup=await create_inline_kb())
+    await callback_query.answer()
+
+
+@router.message(StateFilter(Form.price))
+async def process_payment_proof(message: types.Message, state: FSMContext):
+    tg_id = message.from_user.id
+
+    # Получение идентификатора администратора (замените на реальный ID)
+
+    admins = get_admins()
+    user = get_user(tg_id)
+
+    if message.photo:
+        # Если отправлено фото
+        file = message.photo[-1]
+        print(admins[0])
+
+        await bot.send_photo(chat_id=admins[0][0],
+                             photo=message.photo[0].file_id,
+                               caption=f"Пользователь {user[0]} отправил чек для подтверждения оплаты.")
+        await message.answer("Ваш чек отправлен администратору на проверку.", reply_markup=ReplyKeyboardRemove())
+    elif message.document:
+        # Если отправлен документ
+        file = message.document
+        file_path = f"img/{file.file_id}.{file.file_name.split('.')[-1]}"
+        await bot.download_file_by_id(file.file_id, file_path)
+        file_to_send = FSInputFile(file_path)
+    else:
+        await message.answer("Пожалуйста, отправьте чек в виде фотографии или документа.")
+        return
+
+
+
+    await state.clear()
 
 # Запрос имени на корейском
 @router.message(StateFilter(Form.korean_name))
 async def get_korean_name(message: types.Message, state: FSMContext):
     await state.update_data(korean_name=message.text)
-    await message.answer("Теперь введите вашу дату рождения (например, 1990-01-01):", reply_markup=await create_inline_kb())
+    await message.answer("Теперь введите вашу дату рождения (например, 2024.08.30):",
+                         reply_markup=await create_inline_kb())
     await state.set_state(Form.birth_date)
+
 
 # Запрос даты рождения
 @router.message(StateFilter(Form.birth_date))
-
 async def get_birth_date(message: types.Message, state: FSMContext):
-    await state.update_data(birth_date=message.text)
-    await message.answer("Пожалуйста, отправьте ваше фото:", reply_markup=await create_inline_kb())
-    await state.set_state(Form.photo)
+    # Проверка формата даты
+    date_pattern = r"^\d{4}\.\d{2}\.\d{2}$"
+    if re.match(date_pattern, message.text):
+        await state.update_data(birth_date=message.text)
+        await message.answer("Пожалуйста, отправьте ваше фото:", reply_markup=await create_inline_kb())
+        await state.set_state(Form.photo)
+    else:
+        # Если формат даты неверен, запросить повторный ввод
+        await message.answer("Дата должна быть в формате гггг.мм.дд. Пожалуйста, введите дату снова:")
+
 
 # Запрос фотографии
 @router.message(StateFilter(Form.photo))
@@ -78,6 +136,11 @@ async def get_photo(message: types.Message, state: FSMContext):
         # Удаление фона
         input_image = Image.open(photo_path)
         output_image = remove(input_image)
+
+        # Конвертируем изображение в RGB, если оно не в этом формате
+        # if output_image.mode != 'RGB':
+        #     output_image = output_image.convert('RGB')
+        #
         output_image_path = f"img/removed_{photo.file_id}.png"
         output_image.save(output_image_path)
 
@@ -91,29 +154,48 @@ async def get_photo(message: types.Message, state: FSMContext):
         draw = ImageDraw.Draw(template)
 
         # Позиции для текста и фото (настройте под ваш шаблон)
-        name_position = (100, 100)
-        date_position = (100, 150)
-        photo_position = (300, 100)
-        photo_size = (200, 200)
+        name_position = (630, 192)
+        date_position = (630, 240)
+        photo_position = (150, 190)
+        photo_size = (250, 255)
+        watermark_position = (315, 200)
+        watermark_size = (195, 195)
 
         # Вставка текста
-        #font = ImageFont.truetype("AnjaliOldLipi.ttf", 30)  # Замените шрифт при необходимости
-        draw.text(name_position, korean_name, fill="black")
-        draw.text(date_position, birth_date, fill="black")
+        font_name = ImageFont.truetype("NotoSansCJK-Regular.ttc", 18)  # Замените шрифт при необходимости
+        font = ImageFont.truetype("arial.ttf", 20)  # Замените шрифт при необходимости
+        draw.text(name_position, korean_name, font=font_name, fill="black")
+        draw.text(date_position, birth_date, font=font, fill="black")
 
         # Вставка фотографии
         user_photo = Image.open(output_image_path)
         user_photo = user_photo.resize(photo_size)
-        template.paste(user_photo, photo_position, user_photo)
+        # Если user_photo имеет альфа-канал, извлекаем его для использования в качестве маски
+        if user_photo.mode == 'RGBA':
+            r, g, b, mask = user_photo.split()
+            template.paste(user_photo, photo_position, mask)
+        else:
+            template.paste(user_photo, photo_position)
+
+        # Вставка водяного знака
+        user_photo = Image.open("img/2.png")
+        user_photo = user_photo.resize(watermark_size)
+        template.paste(user_photo, watermark_position, user_photo)
 
         # Сохранение и отправка результата
-        result_path = f"img/result_{photo.file_id}.png"
+        result_path = f"img/result_{photo.file_id}.jpg"
         template.save(result_path)
         await message.reply_photo(photo=FSInputFile(result_path))
+
+        # Удаление временных файлов
+        os.remove(photo_path)
+        os.remove(output_image_path)
+        os.remove(result_path)
 
         # Снижение количества жетонов на 1
         user = get_user(tg_id)
         update_tokens(tg_id, user[3] - 1)
+
     else:
 
         await message.answer("Отправьте фото для генерации картинки.")
@@ -122,8 +204,9 @@ async def get_photo(message: types.Message, state: FSMContext):
     # Завершение состояния
     await state.clear()
 
+
 # Команда добавления жетонов (доступна только администраторам)
-@router.message(F.text =="add_tokens")
+@router.message(F.text.startswith("add"))
 async def add_tokens_command(message: types.Message):
     tg_id = message.from_user.id
     user = get_user(tg_id)
@@ -134,15 +217,18 @@ async def add_tokens_command(message: types.Message):
 
     args = message.text.split()
     if len(args) != 3:
-        await message.answer("Неверный формат команды. Используйте: /add_tokens <tg_id> <количество_жетонов>")
+        await message.answer("Неверный формат команды. Используйте: add <id> <количество_жетонов>")
         return
 
-    target_tg_id = int(args[1])
+    target_id = int(user[0])
     tokens_to_add = int(args[2])
 
-    if not user_exists(target_tg_id):
-        await message.answer("Пользователь с таким tg_id не найден.")
+    user_add = user_exists_2(args[1])
+
+    if not user_exists_2(target_id):
+        await message.answer("Пользователь с таким id не найден.")
         return
 
-    add_tokens(target_tg_id, tokens_to_add)
-    await message.answer(f"Пользователю {target_tg_id} добавлено {tokens_to_add} жетонов.")
+    add_tokens(args[1], tokens_to_add)
+    await message.answer(f"Пользователю {args[1]} добавлено {tokens_to_add} жетонов.")
+    await bot.send_message(chat_id=user_add[1], text=f'Добавлено {tokens_to_add} жетона(ов)')
