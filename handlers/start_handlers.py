@@ -15,7 +15,7 @@ from create_bot import bot
 from database import init_db, add_user, user_exists, get_user, update_tokens, add_tokens, get_admins, user_exists_2, \
     up_lang
 from lexicon_list import text
-from menu.menu import create_inline_kb, price_kb, language_selection_kb
+from menu.menu import create_inline_kb, price_kb, language_selection_kb, kb_price, output_admin
 
 router: Router = Router()
 
@@ -48,9 +48,10 @@ async def start(message: types.Message, state: FSMContext):
 async def choice_language(callback_query: types.CallbackQuery, state: FSMContext):
     language = callback_query.data.split('_')[-1]
     up_language_user = up_lang(language, callback_query.from_user.id)
+    print(callback_query.message.message_id)
     await bot.edit_message_text(
-        chat_id=callback_query.message.from_user.id,
-
+        chat_id=callback_query.message.chat.id,
+        message_id=callback_query.message.message_id,
         text=text[f'{language}']['create_command'])
     await callback_query.answer()
 
@@ -84,35 +85,7 @@ async def price_process(callback_query: types.CallbackQuery, state: FSMContext):
     await callback_query.answer()
 
 
-@router.message(StateFilter(Form.price))
-async def process_payment_proof(message: types.Message, state: FSMContext):
-    tg_id = message.from_user.id
 
-    # Получение идентификатора администратора (замените на реальный ID)
-
-    admins = get_admins()
-    user = get_user(tg_id)
-
-    if message.photo:
-        # Если отправлено фото
-        file = message.photo[-1]
-        print(admins[0])
-
-        await bot.send_photo(chat_id=admins[0][0],
-                             photo=message.photo[0].file_id,
-                             caption=f"Пользователь {user[0]} отправил чек для подтверждения оплаты.")
-        await message.answer("Ваш чек отправлен администратору на проверку.", reply_markup=ReplyKeyboardRemove())
-    elif message.document:
-        # Если отправлен документ
-        file = message.document
-        file_path = f"img/{file.file_id}.{file.file_name.split('.')[-1]}"
-        await bot.download_file_by_id(file.file_id, file_path)
-        file_to_send = FSInputFile(file_path)
-    else:
-        await message.answer("Пожалуйста, отправьте чек в виде фотографии или документа.")
-        return
-
-    await state.clear()
 
 
 # Запрос имени на корейском
@@ -205,7 +178,7 @@ async def get_photo(message: types.Message, state: FSMContext):
         template.paste(user_photo, watermark_position, user_photo)
 
         # Сохранение и отправка результата
-        result_path = f"img/{user[0]}.jpg"
+        result_path = f"img/{message.from_user.id}.jpg"
         template.save(result_path)
 
         # Вставка водяного знака образец
@@ -214,11 +187,11 @@ async def get_photo(message: types.Message, state: FSMContext):
         template.paste(user_photo, sample_position, user_photo)
 
         # Сохранение и отправка результата
-        result_path_sample = f"img/sample_{user[0]}.jpg"
+        result_path_sample = f"img/sample_{message.from_user.id}.jpg"
         template.save(result_path_sample)
         await message.reply_photo(photo=FSInputFile(result_path_sample),
                                   caption=text[f'{user[4]}']['price'],
-                                  reply_markup=await kb_price())
+                                  reply_markup=await kb_price(text_btn=text[f'{user[4]}']['in_Cheque']))
 
     else:
 
@@ -256,3 +229,56 @@ async def add_tokens_command(message: types.Message):
     add_tokens(args[1], tokens_to_add)
     await message.answer(f"Пользователю {args[1]} добавлено {tokens_to_add} жетонов.")
     await bot.send_message(chat_id=user_add[1], text=f'Добавлено {tokens_to_add} жетона(ов)')
+
+
+'''Прикрепление карты'''
+@router.callback_query(F.data.startswith("output_check"))
+async def output_check_callback(callback_query: types.CallbackQuery, state: FSMContext):
+    user = get_user(callback_query.from_user.id)
+    await callback_query.message.answer(text=text[f'{user[4]}']['out_Cheque'])
+    await state.set_state(Form.price)
+    await callback_query.answer()
+
+
+
+'''Обработка отправки сообщения админу с чеком'''
+@router.message(StateFilter(Form.price))
+async def process_payment_proof(message: types.Message, state: FSMContext):
+    tg_id = message.from_user.id
+
+    # Получение идентификатора администратора (замените на реальный ID)
+
+    admins = get_admins()
+    user = get_user(tg_id)
+
+    await message.copy_to(chat_id=admins[0][0],
+                          caption=f"Пользователь {user[0]} отправил чек для подтверждения оплаты.",
+                          reply_markup= await output_admin(user[0]))
+    # if message.photo:
+    #     # Если отправлено фото
+    #     file = message.photo[-1]
+    #     print(admins[0])
+    #
+    #     await bot.send_photo(chat_id=admins[0][0],
+    #                          photo=message.photo[0].file_id,
+    #                          caption=f"Пользователь {user[0]} отправил чек для подтверждения оплаты.",
+    #                          reply_markup=await output_admin(user[0]))
+    #     await message.answer("Ваш чек отправлен администратору на проверку.")
+    # elif message.document:
+    #     # Если отправлен документ
+    #     file = message.document
+    #     file_path = f"img/{file.file_id}.{file.file_name.split('.')[-1]}"
+    #     await bot.download_file(file.file_id, file_path)
+    #
+    #     file_to_send = FSInputFile(file_path)
+    #     await bot.send_photo(chat_id=admins[0][0],
+    #                          photo=message.photo[0].file_id,
+    #                          caption=f"Пользователь {user[0]} отправил чек для подтверждения оплаты.",
+    #                          reply_markup=await output_admin(user[0]))
+    #     await message.answer("Ваш чек отправлен администратору на проверку.")
+    #
+    # else:
+    #     await message.answer("Пожалуйста, отправьте чек в виде фотографии или документа.")
+    #     return
+    await message.answer("Ваш чек отправлен администратору на проверку.")
+    await state.clear()
