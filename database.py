@@ -11,7 +11,8 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tg_id INTEGER UNIQUE,
             role TEXT,
-            tokens INTEGER
+            tokens INTEGER,
+            language TEXT
         )
     ''')
     conn.commit()
@@ -25,9 +26,9 @@ def add_user(tg_id, role='user', tokens=1):
         role = 'admin'
 
     cursor.execute('''
-        INSERT INTO users (tg_id, role, tokens)
-        VALUES (?, ?, ?)
-    ''', (tg_id, role, tokens))
+        INSERT INTO users (tg_id, role, tokens, language)
+        VALUES (?, ?, ?, ?)
+    ''', (tg_id, role, tokens, '🇷🇺Русский'))
     conn.commit()
     conn.close()
 
@@ -85,3 +86,12 @@ def get_admins():
     admins = cursor.fetchall()
     conn.close()
     return admins
+
+
+# Обновление языка у пользователя
+def up_lang(language, tg_id):
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    cursor.execute('UPDATE users SET language = ? WHERE tg_id = ?', (language, tg_id))
+    conn.commit()
+    conn.close()
