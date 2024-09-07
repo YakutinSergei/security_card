@@ -223,7 +223,7 @@ async def process_payment_proof(message: types.Message, state: FSMContext):
 
     admins = get_admins()
     user = get_user(tg_id)
-
+    print(f'{admins=}')
     for admin in admins:
         print(admin)
         await message.copy_to(chat_id=admin[0],
