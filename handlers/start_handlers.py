@@ -225,6 +225,7 @@ async def process_payment_proof(message: types.Message, state: FSMContext):
     user = get_user(tg_id)
 
     for admin in admins:
+        print(admin)
         await message.copy_to(chat_id=admin[0],
                               caption=f"Пользователь {user[0]} отправил чек для подтверждения оплаты.",
                               reply_markup= await output_admin(user[0]))
