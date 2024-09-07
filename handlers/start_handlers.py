@@ -118,7 +118,7 @@ async def get_photo(message: types.Message, state: FSMContext):
         # Скачивание фото
         photo = message.photo[-1]
         file = await bot.get_file(photo.file_id)
-        photo_path = f"img/{photo.file_id}.jpg"
+        photo_path = f"img/photo_{user[1]}.jpg"
         # Скачивание файла
         await bot.download_file(file.file_path, photo_path)
 
