@@ -217,6 +217,7 @@ async def output_check_callback(callback_query: types.CallbackQuery, state: FSMC
 '''Обработка отправки сообщения админу с чеком'''
 @router.message(StateFilter(Form.price))
 async def process_payment_proof(message: types.Message, state: FSMContext):
+    print('zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz')
     tg_id = message.from_user.id
 
     # Получение идентификатора администратора (замените на реальный ID)
