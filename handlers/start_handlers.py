@@ -1,4 +1,5 @@
 import os
+from aiofiles import open as aio_open
 
 from aiogram import  types, F, Router
 from aiogram.filters import StateFilter, CommandStart
@@ -114,24 +115,29 @@ async def get_birth_date(message: types.Message, state: FSMContext):
 async def get_photo(message: types.Message, state: FSMContext):
     if message.photo:
         user = get_user(message.from_user.id)
+        photo_id = message.photo[-1].file_id
+        photo_path = f"img/photo_{user[1]}.jpg"
+        output_image_path = f"img/removed_{user[1]}.png"
 
         # Скачивание фото
-        photo = message.photo[-1]
-        file = await bot.get_file(photo.file_id)
-        photo_path = f"img/photo_{user[1]}.jpg"
-        # Скачивание файла
-        await bot.download_file(file.file_path, photo_path)
+        file = await bot.get_file(message.photo[-1].file_id)
+        async with aio_open(photo_path, 'wb') as f:
+            await bot.download_file(file.file_path, f)
 
-        # Удаление фона
-        input_image = Image.open(photo_path)
-        output_image = remove(input_image)
+        try:
+            # Удаление фона и сохранение изображения
+            async with Image.open(photo_path) as input_image:
+                output_image = remove(input_image)
+                if output_image.mode != 'RGB':
+                    output_image = output_image.convert('RGB')
 
-        # Конвертируем изображение в RGB, если оно не в этом формате
-        # if output_image.mode != 'RGB':
-        #     output_image = output_image.convert('RGB')
-        #
-        output_image_path = f"img/removed_{user[1]}.png"
-        output_image.save(output_image_path)
+                async with aio_open(output_image_path, 'wb') as f:
+                    output_image.save(f, format='PNG')
+
+
+
+        except Exception as e:
+            print(f"Ошибка при обработке изображения: {e}")
 
         # Получение данных
         user_data = await state.get_data()
