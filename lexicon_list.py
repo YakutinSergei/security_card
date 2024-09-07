@@ -12,6 +12,8 @@ text = {'Русский':
              'error': 'Ошибка!',
              'in_Cheque': 'Прикрепить чек',
              'out_Cheque': 'Отправьте чек',
+             'error_check': 'Ваш чек не прошел проверку.',
+             'send_message': 'Ваш чек отправлен администратору на проверку.',
              'create_command': 'Для генерации карты безопасности пришлите в чат команду /create_card',
              },
         'English':
@@ -24,11 +26,13 @@ text = {'Русский':
              'error': 'Error!',
              'in_Cheque': 'Attach a receipt',
              'out_Cheque': 'Send the receipt',
+             'error_check': 'Your receipt has not been verified.',
+             'send_message': 'Your receipt has been sent to the administrator for verification.',
              'create_command': 'To generate a security card, send the /create_card command to the chat',
              },
         'Uzbek':
-            {'name': "Tug'ilgan sana (yyyy.oo.ss)",
-             'dateOfBirth': 'Date of birth (yyyy.mm.dd)',
+            {'name': "Ismingizni koreyscha yozing",
+             'dateOfBirth': "Tug'ilgan sana (yyyy.oo.ss)",
              'photo': "Suratingizni yuboring (shlyapasiz, ko'zoynaksiz, oq fonda suratga oling)",
              'price': "Suratni yuklab olish uchun 20 ming von to'lang yoki rus kartasiga 1300 rubl .Siz rus kartasiga pul o'tkazishingiz mumkin Sberbank\n"
                       "2202 2062 5534 9958 Захарова Галсан Ханда\n"
@@ -40,7 +44,9 @@ text = {'Русский':
              'error': 'Xato!',
              'in_Cheque': 'chekni ilova qiling',
              'out_Cheque': 'chek yuboring',
-             'create_command': 'Xavfsizlik kartasini yaratish uchun chatga buyruq yuboring /create card',
+             'error_check': 'Chekingiz tasdiqlanmagan',
+             'send_message': "Chekingiz ko'rib chiqish uchun administratorga yuborildi",
+             'create_command': 'Xavfsizlik kartasini yaratish uchun chatga buyruq yuboring /create_card',
              },
         'Kazakh':
             {'name': "Аты-жөніңізді корей тілінде жазыңыз",
@@ -56,7 +62,9 @@ text = {'Русский':
              'error': 'қате!',
              'in_Cheque': 'чекті тіркеңіз',
              'out_Cheque': 'чек жіберіңіз',
-             'create_command': 'Қауіпсіздік картасын жасау үшін чатқа пәрмен жіберіңіз /create card',
+             'error_check': 'Чекіңіз расталмады',
+             'send_message': 'Чекіңіз қарау үшін әкімшіге жіберілді',
+             'create_command': 'Қауіпсіздік картасын жасау үшін чатқа пәрмен жіберіңіз /create_card',
              },
         'Vietnamese':
             {'name': "Viết tên của bạn bằng tiếng Hàn",
@@ -71,7 +79,9 @@ text = {'Русский':
              'error': 'lỗi!',
              'in_Cheque': 'đính kèm một tấm séc',
              'out_Cheque': 'gửi séc',
-             'create_command': 'Để tạo thẻ bảo mật, hãy gửi lệnh đến cuộc trò chuyện /create card',
+             'error_check': 'Séc của bạn chưa được xác minh',
+             'send_message': 'Séc của bạn đã được gửi đến quản trị viên để xem xét',
+             'create_command': 'Để tạo thẻ bảo mật, hãy gửi lệnh đến cuộc trò chuyện /create_card',
              },
         'Sri Lankan':
             {'name': "ඔබේ නම කොරියානු භාෂාවෙන් ලියන්න",
@@ -86,6 +96,8 @@ text = {'Русский':
              'error': 'දෝෂය!',
              'in_Cheque': 'චෙක්පතක් අමුණන්න ',
              'out_Cheque': 'චෙක්පතක් එවන්න  ',
-             'create_command': 'ආරක්ෂක කාඩ්පතක් උත්පාදනය කිරීමට, කතාබස් වෙත විධානයක් යවන්න /create card',
+             'error_check': 'ඔබගේ චෙක්පත සත්‍යාපනය කර නැත - ',
+             'send_message': 'ඔබගේ චෙක්පත සමාලෝචනය සඳහා පරිපාලක වෙත යවා ඇත ',
+             'create_command': 'ආරක්ෂක කාඩ්පතක් උත්පාදනය කිරීමට, කතාබස් වෙත විධානයක් යවන්න /create_card',
              },
         }

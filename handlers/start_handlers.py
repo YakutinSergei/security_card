@@ -1,21 +1,17 @@
 import os
-import re
 
-from aiogram import Bot, Dispatcher, types, F, Router
-from aiogram.filters import Command, StateFilter, CommandStart
+from aiogram import  types, F, Router
+from aiogram.filters import StateFilter, CommandStart
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InputFile, FSInputFile
-from humanfriendly.terminal import message
+from aiogram.types import FSInputFile
 from rembg import remove
 from PIL import Image, ImageDraw, ImageFont
 
 from create_bot import bot
-from database import init_db, add_user, user_exists, get_user, update_tokens, add_tokens, get_admins, user_exists_2, \
-    up_lang
+from database import add_user, user_exists, get_user, get_admins, up_lang, get_user_id
 from lexicon_list import text
-from menu.menu import create_inline_kb, price_kb, language_selection_kb, kb_price, output_admin
+from menu.menu import create_inline_kb, language_selection_kb, kb_price, output_admin
 
 router: Router = Router()
 
@@ -48,7 +44,6 @@ async def start(message: types.Message, state: FSMContext):
 async def choice_language(callback_query: types.CallbackQuery, state: FSMContext):
     language = callback_query.data.split('_')[-1]
     up_language_user = up_lang(language, callback_query.from_user.id)
-    print(callback_query.message.message_id)
     await bot.edit_message_text(
         chat_id=callback_query.message.chat.id,
         message_id=callback_query.message.message_id,
@@ -62,7 +57,7 @@ async def choice_language(callback_query: types.CallbackQuery, state: FSMContext
 @router.message(F.text == '/create_card')
 async def create_card(message: types.Message, state: FSMContext):
     user = get_user(message.from_user.id)
-    await message.answer(text=text[f'{user[4]}']['name'], reply_markup=await create_inline_kb())
+    await message.answer(text=text[f'{user[4]}']['name'], reply_markup=await create_inline_kb(text[f'{user[4]}']['cancel']))
     await state.set_state(Form.korean_name)
 
 
@@ -77,11 +72,13 @@ async def cancel_process(callback_query: types.CallbackQuery, state: FSMContext)
 # Обработка команды покупки
 @router.callback_query(F.data == 'price')
 async def price_process(callback_query: types.CallbackQuery, state: FSMContext):
+    user = get_user(callback_query.message.from_user.id)
+
     await state.set_state(Form.price)
     await callback_query.message.answer(
         "Для покупки карты безопасности сделайте перевод в размере 5000 рублей на номер карты 0000 0000 0000 0000 0000 и отправьте чек.\n"
         "Или нажмите кнопку отмена",
-        reply_markup=await create_inline_kb())
+        reply_markup=await create_inline_kb(text[f'{user[4]}']['cancel']))
     await callback_query.answer()
 
 
@@ -94,7 +91,7 @@ async def get_korean_name(message: types.Message, state: FSMContext):
     await state.update_data(korean_name=message.text)
     user = get_user(message.from_user.id)
     await message.answer(text=text[f'{user[4]}']['dateOfBirth'],
-                         reply_markup=await create_inline_kb())
+                         reply_markup=await create_inline_kb(text[f'{user[4]}']['cancel']))
     await state.set_state(Form.birth_date)
 
 
@@ -108,7 +105,7 @@ async def get_birth_date(message: types.Message, state: FSMContext):
     result_path = f"img/photo.jpg"
     await message.answer_photo(photo=FSInputFile(result_path),
                                caption=text[f'{user[4]}']['photo'],
-                               reply_markup=await create_inline_kb())
+                               reply_markup=await create_inline_kb(text[f'{user[4]}']['cancel']))
     await state.set_state(Form.photo)
 
 
@@ -116,7 +113,6 @@ async def get_birth_date(message: types.Message, state: FSMContext):
 @router.message(StateFilter(Form.photo))
 async def get_photo(message: types.Message, state: FSMContext):
     if message.photo:
-        tg_id = message.from_user.id
         user = get_user(message.from_user.id)
 
         # Скачивание фото
@@ -134,7 +130,7 @@ async def get_photo(message: types.Message, state: FSMContext):
         # if output_image.mode != 'RGB':
         #     output_image = output_image.convert('RGB')
         #
-        output_image_path = f"img/removed_{photo.file_id}.png"
+        output_image_path = f"img/removed_{user[1]}.png"
         output_image.save(output_image_path)
 
         # Получение данных
@@ -202,35 +198,6 @@ async def get_photo(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-# Команда добавления жетонов (доступна только администраторам)
-@router.message(F.text.startswith("add"))
-async def add_tokens_command(message: types.Message):
-    tg_id = message.from_user.id
-    user = get_user(tg_id)
-
-    if user[2] != "admin":
-        await message.answer("У вас нет прав для выполнения этой команды.")
-        return
-
-    args = message.text.split()
-    if len(args) != 3:
-        await message.answer("Неверный формат команды. Используйте: add <id> <количество_жетонов>")
-        return
-
-    target_id = int(user[0])
-    tokens_to_add = int(args[2])
-
-    user_add = user_exists_2(args[1])
-
-    if not user_exists_2(target_id):
-        await message.answer("Пользователь с таким id не найден.")
-        return
-
-    add_tokens(args[1], tokens_to_add)
-    await message.answer(f"Пользователю {args[1]} добавлено {tokens_to_add} жетонов.")
-    await bot.send_message(chat_id=user_add[1], text=f'Добавлено {tokens_to_add} жетона(ов)')
-
-
 '''Прикрепление карты'''
 @router.callback_query(F.data.startswith("output_check"))
 async def output_check_callback(callback_query: types.CallbackQuery, state: FSMContext):
@@ -251,34 +218,42 @@ async def process_payment_proof(message: types.Message, state: FSMContext):
     admins = get_admins()
     user = get_user(tg_id)
 
-    await message.copy_to(chat_id=admins[0][0],
-                          caption=f"Пользователь {user[0]} отправил чек для подтверждения оплаты.",
-                          reply_markup= await output_admin(user[0]))
-    # if message.photo:
-    #     # Если отправлено фото
-    #     file = message.photo[-1]
-    #     print(admins[0])
-    #
-    #     await bot.send_photo(chat_id=admins[0][0],
-    #                          photo=message.photo[0].file_id,
-    #                          caption=f"Пользователь {user[0]} отправил чек для подтверждения оплаты.",
-    #                          reply_markup=await output_admin(user[0]))
-    #     await message.answer("Ваш чек отправлен администратору на проверку.")
-    # elif message.document:
-    #     # Если отправлен документ
-    #     file = message.document
-    #     file_path = f"img/{file.file_id}.{file.file_name.split('.')[-1]}"
-    #     await bot.download_file(file.file_id, file_path)
-    #
-    #     file_to_send = FSInputFile(file_path)
-    #     await bot.send_photo(chat_id=admins[0][0],
-    #                          photo=message.photo[0].file_id,
-    #                          caption=f"Пользователь {user[0]} отправил чек для подтверждения оплаты.",
-    #                          reply_markup=await output_admin(user[0]))
-    #     await message.answer("Ваш чек отправлен администратору на проверку.")
-    #
-    # else:
-    #     await message.answer("Пожалуйста, отправьте чек в виде фотографии или документа.")
-    #     return
-    await message.answer("Ваш чек отправлен администратору на проверку.")
+    for admin in admins:
+        await message.copy_to(chat_id=admin[0],
+                              caption=f"Пользователь {user[0]} отправил чек для подтверждения оплаты.",
+                              reply_markup= await output_admin(user[0]))
+
+    await message.answer(text=text[f'{user[4]}']['send_message'])
     await state.clear()
+
+
+'''Ответ админа'''
+@router.callback_query(F.data.startswith("chPhoto_"))
+async def output_check_callback(callback: types.CallbackQuery):
+    user = get_user_id(callback.data.split('_')[1])
+    if callback.data.split('_')[-1] == "no":
+        await bot.send_message(chat_id=user[1],
+                               text=text[f'{user[4]}']['error_check'])
+        await bot.delete_message(chat_id=callback.message.chat.id,
+                                 message_id=callback.message.message_id)
+        await callback.answer()
+    else:
+        # Путь к результату
+        result_path_sample = f"img/{user[1]}.jpg"
+
+        try:
+            # Отправка результата пользователю
+            await bot.send_photo(chat_id=user[1], photo=FSInputFile(result_path_sample))
+
+            # Удаление файла после отправки
+            os.remove(result_path_sample)
+            os.remove(f"img/sample_{user[1]}.jpg")
+            os.remove(f"img/removed_{user[1]}.jpg")
+
+        except FileNotFoundError:
+            print(f"Файл {result_path_sample} не найден для удаления.")
+
+        # Удаление сообщения у администратора
+        await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
+
+    await callback.answer()

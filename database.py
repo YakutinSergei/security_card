@@ -95,3 +95,13 @@ def up_lang(language, tg_id):
     cursor.execute('UPDATE users SET language = ? WHERE tg_id = ?', (language, tg_id))
     conn.commit()
     conn.close()
+
+
+'''Получить данные по id'''
+def get_user_id(id):
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE id = ?', (id,))
+    user = cursor.fetchone()
+    conn.close()
+    return user
