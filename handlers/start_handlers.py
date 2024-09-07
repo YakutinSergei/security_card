@@ -217,19 +217,19 @@ async def output_check_callback(callback_query: types.CallbackQuery, state: FSMC
 '''Обработка отправки сообщения админу с чеком'''
 @router.message(StateFilter(Form.price))
 async def process_payment_proof(message: types.Message, state: FSMContext):
-    print('zZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZz')
     tg_id = message.from_user.id
 
     # Получение идентификатора администратора (замените на реальный ID)
 
     admins = get_admins()
     user = get_user(tg_id)
-    print(f'{admins=}')
     for admin in admins:
-        print(admin)
-        await message.copy_to(chat_id=admin[0],
-                              caption=f"Пользователь {user[0]} отправил чек для подтверждения оплаты.",
-                              reply_markup= await output_admin(user[0]))
+        try:
+            await message.copy_to(chat_id=admin[0],
+                                  caption=f"Пользователь {user[0]} отправил чек для подтверждения оплаты.",
+                                  reply_markup= await output_admin(user[0]))
+        except Exception as e:
+            print(e)
 
     await message.answer(text=text[f'{user[4]}']['send_message'])
     await state.clear()
